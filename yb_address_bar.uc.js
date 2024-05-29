@@ -125,7 +125,7 @@
             ybDomainButton.className = 'YBDomainButton Hidden';
 
             ybDomainButton.onclick = () => {
-                window.gBrowser.loadTabs([host], {
+                window.gBrowser.loadTabs([gBrowser.currentURI.host], {
                     replace: true,
                     allowThirdPartyFixup: true,
                     triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
