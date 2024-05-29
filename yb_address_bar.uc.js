@@ -1,137 +1,151 @@
 (function yb_address_bar() {
-    "use strict";
+    'use strict';
+
+    // const USE_ACCENT_COLOR = Services.prefs.getBoolPref("floorp.titlebar.favicon.color");
+    const USE_ACCENT_COLOR = false;
+
+    const ACCENT_BG = 'var(--floorp-tab-panel-bg-color)';
+    const ACCENT_FG = 'var(--floorp-tab-panel-fg-color)';
+    const GREY_BG = 'var(--grey-30)';
+    const GREY_FG = 'var(--grey-60)';
 
     const STYLE = `
         .YBDomainButton {
-            background-color: var(--urlbar-box-bgcolor);
-            color: var(--urlbar-box-text-color);
+            display: flex;
+            align-items: center;
             padding-inline: 8px;
-            border-radius: var(--urlbar-icon-border-radius);
-            margin-right: 4px;
-            transition: background-color 1.25s var(--animation-easing-function) !important;
+            padding-bottom: 2px;
+            border-radius: 4px;
+            font-size: 13px;
+            height: 16px;
+            margin: auto 8px auto 0;
+            background-color: ${USE_ACCENT_COLOR ? ACCENT_BG : GREY_BG};
+            color: ${USE_ACCENT_COLOR ? ACCENT_FG : GREY_FG};
+            transition: filter 2s var(--animation-easing-function),
+                background-color 2s var(--animation-easing-function),
+                color 2s var(--animation-easing-function);
         }
 
         .YBDomainButton:hover {
-            background-color: var(--urlbar-box-hover-bgcolor);
-            color: var(--urlbar-box-hover-text-color);
+            filter: brightness(125%);
+        }
+
+        .YBDomainButton.Hidden {
+            display: none;
         }
     `;
 
     const TIMEOUT = 10;
 
     class YBAddressBar {
-        urlbarMutationObserver = null;
-
         constructor() {
-            this.#addStyle();
-            this.urlbarMutationObserver = this.#createUrlbarInputMutationObserver();
-            this.#observeTabSelection();
+            this.addStyle();
+            this.observeLocationChange();
+            this.observeUrlbarFocused();
+            this.update();
         }
 
-        // listeners
-
-        #observeTabSelection() {
-            gBrowser.tabContainer.addEventListener("TabSelect", () => {
-                this.deleteYBDomainButtons();
-                setTimeout(() => this.placeYb(), TIMEOUT);
-            })
+        observeLocationChange() {
+            document.addEventListener('floorpOnLocationChangeEvent', () => {
+                this.updateDelayed();
+            });
         }
 
-        #createUrlbarInputMutationObserver() {
-            if (!this.#urlbarInput) {
-                setTimeout(() => this.#createUrlbarInputMutationObserver(), TIMEOUT);
+        observeUrlbarFocused() {
+            if (!this.#urlbar) {
+                setTimeout(() => this.observeUrlbarFocused(), TIMEOUT);
                 return;
             }
 
-            const titleMutationObserver = new MutationObserver((records) => {
-                this.deleteYBDomainButtons();
-                setTimeout(() => this.placeYb(), TIMEOUT);
+            this.urlbarObserver = new MutationObserver((records) => {
+                for (const record of records) {
+                    if (record.type === 'attributes' && record.attributeName === 'focused') {
+                        this.updateDelayed();
+                        break;
+                    }
+                }
             });
-            titleMutationObserver.observe(this.#urlbarInput, {
+            this.urlbarObserver.observe(this.#urlbar, {
                 attributes: true,
-                childList: true
             });
-            return titleMutationObserver;
         }
 
-        // builders
-
-        #createStyle() {
+        addStyle() {
             const style = document.createElement('style');
             style.innerHTML = STYLE;
-            return style;
+            this.#head.appendChild(style);
         }
 
-        #createYBDomainButton() {
-            var host = gBrowser.currentURI.host;
+        updateDelayed() {
+            setTimeout(() => this.update(), TIMEOUT);
+        }
 
+        update() {
+            if (
+                this.#urlbar.getAttribute('focused') === 'true' ||
+                gBrowser.currentURI.scheme === 'about'
+            ) {
+                this.hideYBDomainButton();
+                return;
+            }
+
+            if (!this.#urlbarInputContainer || !this.#urlbarInput) {
+                this.hideYBDomainButton();
+                this.updateDelayed();
+                return;
+            }
+
+            try {
+                if (!this.#ybDomainButton) {
+                    this.createYBDomainButton();
+                }
+                this.updateHost();
+                this.updateTitle();
+                this.showYBDomainButton();
+            } catch (error) {
+                this.updateDelayed();
+                return;
+            }
+        }
+
+        hideYBDomainButton() {
+            if (this.#ybDomainButton) {
+                this.#ybDomainButton.classList.add('Hidden');
+            }
+        }
+
+        showYBDomainButton() {
+            if (this.#ybDomainButton) {
+                this.#ybDomainButton.classList.remove('Hidden');
+            }
+        }
+
+        createYBDomainButton() {
             const ybDomainButton = document.createElement('div');
-            ybDomainButton.innerText = host;
-            ybDomainButton.className = 'YBDomainButton';
+            ybDomainButton.className = 'YBDomainButton Hidden';
 
             ybDomainButton.onclick = () => {
                 window.gBrowser.loadTabs([host], {
                     replace: true,
                     allowThirdPartyFixup: true,
-                    triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
+                    triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
                 });
             };
 
             this.#urlbarInputContainer.insertBefore(ybDomainButton, this.#urlbarInputBox);
-            return ybDomainButton;
         }
 
-        #createYbTitle() {
+        updateHost() {
+            this.#ybDomainButton.innerText = gBrowser.currentURI.host;
+        }
+
+        updateTitle() {
             var title = gBrowser.contentTitle;
-
-            if (!title)  {
-                throw "Empty title";
-            };
-
+            if (!title) {
+                throw 'Empty title';
+            }
             this.#urlbarInput.value = title;
         }
-
-        // actions
-
-        #addStyle() {
-            this.#head.appendChild(this.#createStyle());
-        }
-
-        placeYb() {
-            if (this.#urlbar.getAttribute("focused") === "true" || gBrowser.currentURI.scheme === "about") {
-                return;
-            }
-
-            if (!this.#urlbarInputContainer || !this.#urlbarInput) {
-                setTimeout(() => this.placeYb(), TIMEOUT);
-                return;
-            }
-
-            try {
-                this.deleteYBDomainButtons();
-                this.placeYBDomainButton();
-                this.placeYBTitle();
-            } catch (error) {
-                setTimeout(() => this.placeYb(), TIMEOUT);
-                return;
-            }
-        }
-
-        deleteYBDomainButtons() {
-            for (const e of this.#ybDomainButtons) {
-                this.#urlbarInputContainer.removeChild(e);
-            }
-        }
-
-        placeYBDomainButton() {
-            this.#createYBDomainButton();
-        }
-
-        placeYBTitle() {
-            this.#createYbTitle();
-        }
-
-        // getters
 
         get #head() {
             return document.querySelector('head');
@@ -153,10 +167,10 @@
             return document.querySelector('#urlbar-input');
         }
 
-        get #ybDomainButtons() {
-            return document.querySelectorAll('.YBDomainButton');
+        get #ybDomainButton() {
+            return document.querySelector('.YBDomainButton');
         }
-    };
+    }
 
     var interval = setInterval(() => {
         if (document.querySelector('#browser')) {
