@@ -1,26 +1,26 @@
 (function yb_address_bar() {
     'use strict';
 
-    // const USE_ACCENT_COLOR = Services.prefs.getBoolPref("floorp.titlebar.favicon.color");
-    const USE_ACCENT_COLOR = false;
+    const USE_ACCENT_COLOR = Services.prefs.getBoolPref('floorp.titlebar.favicon.color');
 
-    const ACCENT_BG = 'var(--floorp-tab-panel-bg-color)';
-    const ACCENT_FG = 'var(--floorp-tab-panel-fg-color)';
     const GREY_BG = 'var(--grey-30)';
     const GREY_FG = 'var(--grey-60)';
+    const FAVICON_BG = `var(--floorp-favicon-bg-color, var(--floorp-tab-panel-bg-color, ${GREY_BG}))`;
+    const FAVICON_FG = `var(--floorp-favicon-fg-color, var(--floorp-tab-panel-fg-color, ${GREY_FG}))`;
 
     const STYLE = `
         .YBDomainButton {
-            display: flex;
-            align-items: center;
+            background-color: ${USE_ACCENT_COLOR ? FAVICON_BG : GREY_BG};
+            color: ${USE_ACCENT_COLOR ? FAVICON_FG : GREY_FG};
             padding-inline: 8px;
             padding-bottom: 2px;
             border-radius: 4px;
+            margin: 2px 8px 2px 0;
+            height: auto;
+            overflow: hidden;
             font-size: 13px;
-            height: 16px;
-            margin: auto 8px auto 0;
-            background-color: ${USE_ACCENT_COLOR ? ACCENT_BG : GREY_BG};
-            color: ${USE_ACCENT_COLOR ? ACCENT_FG : GREY_FG};
+            display: flex;
+            align-items: center;
             transition: filter 2s var(--animation-easing-function),
                 background-color 2s var(--animation-easing-function),
                 color 2s var(--animation-easing-function);
